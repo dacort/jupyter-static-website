@@ -1,0 +1,24 @@
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      python: 3.8
+    commands:
+      - pip install --upgrade pip
+      - pip install -r site/requirements.txt
+  pre_build:
+    on-failure: CONTINUE
+    commands:
+      - cd site
+      - for file in $(find docs -name '*.ipynb'); do echo "Converting ${file}"; python convert.py $file ${file}_new && cp ${file}_new ${file}; rm ${file}_new; done
+  build:
+    commands:
+      # Build
+      - mkdocs build
+  post_build:
+    commands:
+      # Post Build
+artifacts:
+  base-directory: "site/site*"
+  files:
+    - "**/*"

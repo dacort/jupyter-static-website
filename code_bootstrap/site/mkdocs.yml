@@ -1,0 +1,19 @@
+site_name: My Awesome Notebooks
+theme:
+  name: 'flatly'
+    
+nav:
+  - Home: index.md
+  - Notebooks:
+    - Oura Sleep Analysis: notebooks/damons_sleep.ipynb
+
+plugins:
+  - mknotebooks
+
+# markdown_extensions:
+#     - codehilite:
+#         guess_lang: false
+
+# mknotebooks:
+#    enable_default_jupyter_cell_styling: false
+#    enable_default_pandas_dataframe_styling: false

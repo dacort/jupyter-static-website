@@ -1,7 +1,9 @@
+import os
 from aws_cdk import (
     core as cdk,
     aws_s3 as s3,
     aws_s3_deployment as s3d,
+    aws_s3_assets as s3a,
     aws_certificatemanager as acm,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
@@ -52,6 +54,12 @@ class EmrStudioPublisherStack(cdk.Stack):
         )
 
         # Upload the initial version of the site repository to the website bucket
+        artifacts_path = os.path.join(os.path.dirname(__file__), "..", "code_bootstrap")
+        repo_artifact = s3a.Asset(
+            self,
+            'repo-artifact',
+            path=os.path.normpath(artifacts_path)
+        )
         repo_artifacts = s3d.BucketDeployment(
             self,
             "repo-artifacts",
@@ -113,7 +121,7 @@ function handler(event) {
             domain_names=list(filter(None, [domain_name])),
             certificate=my_certificate,
         )
-        cdk.CfnOutput(self, "cloudfront-endpoint", value=distribution.domain_name)
+        cdk.CfnOutput(self, "cloudfront-endpoint", value=f"https://{distribution.domain_name}")
 
         #         index_function = cloudfront.CfnFunction(
         #             self,
@@ -162,13 +170,12 @@ function handler(event) {
             repository_description="Our publicy shared notebooks",
             code=codecommit.CfnRepository.CodeProperty(
                 s3=codecommit.CfnRepository.S3Property(
-                    bucket=notebook_website_bucket.bucket_name,
-                    key="init_revision.zip",
+                    bucket=repo_artifact.s3_bucket_name,
+                    key=repo_artifact.s3_object_key,
                 ),
                 branch_name="main",
             ),
         )
-        repo2.node.add_dependency(repo_artifacts)
         repo = codecommit.Repository.from_repository_arn(
             self, "data-team-repo", repo2.attr_arn
         )
