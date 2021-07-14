@@ -55,9 +55,7 @@ class EmrStudioPublisherStack(cdk.Stack):
         # Upload the initial version of the site repository to the website bucket
         artifacts_path = os.path.join(os.path.dirname(__file__), "..", "code_bootstrap")
         repo_artifact = s3a.Asset(
-            self,
-            'repo-artifact',
-            path=os.path.normpath(artifacts_path)
+            self, "repo-artifact", path=os.path.normpath(artifacts_path)
         )
 
         # Create a CloudFront function to redirect subdirectories to index.html
@@ -114,7 +112,9 @@ function handler(event) {
             domain_names=list(filter(None, [domain_name])),
             certificate=my_certificate,
         )
-        cdk.CfnOutput(self, "cloudfront-endpoint", value=f"https://{distribution.domain_name}")
+        cdk.CfnOutput(
+            self, "cloudfront-endpoint", value=f"https://{distribution.domain_name}"
+        )
 
         # EMR Studio can use service catalog templates to deploy clusters.
         # That is disabled in this version of the stack.
