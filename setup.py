@@ -19,7 +19,17 @@ setuptools.setup(
     packages=setuptools.find_packages(where="emr_studio_publisher"),
 
     install_requires=[
-        "aws-cdk.core==1.102.0",
+        "aws-cdk.core==1.110.0",
+        "aws-cdk.aws-s3",
+        "aws-cdk.aws-s3-deployment",
+        "aws-cdk.aws-cloudfront",
+        "aws-cdk.aws-cloudfront-origins",
+        "aws-cdk.aws-codecommit",
+        "aws-cdk.aws-codebuild",
+        "aws-cdk.aws-codepipeline",
+        "aws-cdk.aws-codepipeline-actions",
+        "aws-cdk.aws-servicecatalog",
+        "aws-cdk.aws-certificatemanager"
     ],
 
     python_requires=">=3.6",
