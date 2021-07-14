@@ -31,6 +31,14 @@ One of the outputs from this stack will be `CloudfrontCertificateStack.certifica
 
 _If you are not using a custom domain, you can omit both of the `-c` options below._
 
+First, make sure you bootstrap your AWS environment.
+
+```shell
+cdk bootstrap aws://ACCOUNT-NUMBER-1/REGION-1
+```
+
+Once you do that, you can deploy the stack.
+
 ```shell
 cdk deploy EmrStudioPublisherStack -c domain_name=notebooks.example.com -c certificate_arn=arn:aws:acm:us-east-1:012345678912:certificate/f07b01a4-3e8c-4639-8a22-b7a20a832de3
 ```

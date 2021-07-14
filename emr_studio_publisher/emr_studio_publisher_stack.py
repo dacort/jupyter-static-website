@@ -1,7 +1,8 @@
+import os
 from aws_cdk import (
     core as cdk,
     aws_s3 as s3,
-    aws_s3_deployment as s3d,
+    aws_s3_assets as s3a,
     aws_certificatemanager as acm,
     aws_cloudfront as cloudfront,
     aws_cloudfront_origins as origins,
@@ -52,11 +53,9 @@ class EmrStudioPublisherStack(cdk.Stack):
         )
 
         # Upload the initial version of the site repository to the website bucket
-        repo_artifacts = s3d.BucketDeployment(
-            self,
-            "repo-artifacts",
-            destination_bucket=notebook_website_bucket,
-            sources=[s3d.Source.asset("./artifacts")],
+        artifacts_path = os.path.join(os.path.dirname(__file__), "..", "code_bootstrap")
+        repo_artifact = s3a.Asset(
+            self, "repo-artifact", path=os.path.normpath(artifacts_path)
         )
 
         # Create a CloudFront function to redirect subdirectories to index.html
@@ -113,48 +112,17 @@ function handler(event) {
             domain_names=list(filter(None, [domain_name])),
             certificate=my_certificate,
         )
-        cdk.CfnOutput(self, "cloudfront-endpoint", value=distribution.domain_name)
+        cdk.CfnOutput(
+            self, "cloudfront-endpoint", value=f"https://{distribution.domain_name}"
+        )
 
-        #         index_function = cloudfront.CfnFunction(
-        #             self,
-        #             "index_redirect",
-        #             name="index_redirect",
-        #             auto_publish=True,
-        #             function_config=cloudfront.CfnFunction.FunctionConfigProperty(
-        #                 comment="Index redirector", runtime="cloudfront-js-1.0"
-        #             ),
-        #             function_code="""
-        # function handler(event) {
-        #     var request = event.request;
-        #     var uri = request.uri;
-
-        #     // Check whether the URI is missing a file name.
-        #     if (uri.endsWith('/')) {
-        #         request.uri += 'index.html';
-        #     }
-        #     // Check whether the URI is missing a file extension.
-        #     else if (!uri.includes('.')) {
-        #         request.uri += '/index.html';
-        #     }
-
-        #     return request;
-        # }
-        # """,
-        #         )
-
+        # EMR Studio can use service catalog templates to deploy clusters.
+        # That is disabled in this version of the stack.
         # svc_cat_prod = self.create_service_catalog_template("arn:aws:iam::111122223333:role/EMRStudio-EMRStudioUserRole230891F0-GK7R75XW85LU")
 
-        # Create a repo for our stuff
-        # repo = codecommit.Repository(
-        #     self,
-        #     "data-science-team-repo",
-        #     repository_name="data-notebooks",
-        #     description="Data Science / Analyst Team Notebooks",
-        # )
-        # In theory, I can also pre-popualte the repo using https://docs.aws.amazon.com/cdk/api/latest/docs/@aws-cdk_aws-codecommit.CfnRepository.html
-        # Which is what I want to do...I want to have mkdocs there by default
-        # We use a CfnRepository because we want to specify code to bootstrap it
-        # BUT...other methods below expect a repository, so we create the construct from the cfn one.
+        # Create a CodeCommit repo for our website
+        # We use `CfnRepository` so that we can pre-populate with an initial site.
+        # Other methods below expect a `codecommit.Repository``, so we create the construct from the cfn one.
         repo2 = codecommit.CfnRepository(
             self,
             "data-team-repo-cfn",
@@ -162,13 +130,12 @@ function handler(event) {
             repository_description="Our publicy shared notebooks",
             code=codecommit.CfnRepository.CodeProperty(
                 s3=codecommit.CfnRepository.S3Property(
-                    bucket=notebook_website_bucket.bucket_name,
-                    key="init_revision.zip",
+                    bucket=repo_artifact.s3_bucket_name,
+                    key=repo_artifact.s3_object_key,
                 ),
                 branch_name="main",
             ),
         )
-        repo2.node.add_dependency(repo_artifacts)
         repo = codecommit.Repository.from_repository_arn(
             self, "data-team-repo", repo2.attr_arn
         )
@@ -182,19 +149,13 @@ function handler(event) {
         )
 
         # Now let's build a codepipeline that can:
-        # - Deploy any cluster templates to Service Catalog
-        # - Deploy our website to S3
+        # - Build the static website from the source code
+        # - Copy the resulting artifact to S3
         source_artifact = codepipeline.Artifact("SourceArtifact")
         build_artifact = codepipeline.Artifact("BuildArtifact")
         code_source = codepipeline_actions.CodeCommitSourceAction(
             output=source_artifact, repository=repo, branch="main", action_name="Source"
         )
-        # sc_deploy = codepipeline_actions.ServiceCatalogDeployActionBeta1(
-        #     product_id="prod-unzapsuxmjhmk",
-        #     product_version_name="v1.0.0",
-        #     template_path=source_artifact.at_path("/cfn/docker-cluster.yaml"),
-        #     action_name="Deploy",
-        # )
 
         cp_build = codepipeline_actions.CodeBuildAction(
             input=source_artifact,
@@ -208,6 +169,13 @@ function handler(event) {
             action_name="WebsiteDeploy",
             input=build_artifact,
         )
+        # - (disabled) Deploy any cluster templates to Service Catalog
+        # sc_deploy = codepipeline_actions.ServiceCatalogDeployActionBeta1(
+        #     product_id="prod-unzapsuxmjhmk",
+        #     product_version_name="v1.0.0",
+        #     template_path=source_artifact.at_path("/cfn/docker-cluster.yaml"),
+        #     action_name="Deploy",
+        # )
 
         website_pipeline = codepipeline.Pipeline(
             self,
